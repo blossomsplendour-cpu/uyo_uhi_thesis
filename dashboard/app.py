@@ -17,7 +17,8 @@ st.set_page_config(
     layout="wide"
 )
 
-PROJECT_DIR = Path('/content/drive/MyDrive/uyo_uhi')
+# DYNAMIC RELATIVE PATH: Resolves correctly on Streamlit Cloud, Colab, or local PC
+PROJECT_DIR = Path(__file__).parent.parent.resolve()
 out_dir = PROJECT_DIR / 'data' / 'outputs'
 fig_dir = PROJECT_DIR / 'figures'
 
@@ -58,14 +59,10 @@ mode = st.sidebar.radio(
 date_options = summary_df['date'].tolist()
 scene_map = dict(zip(summary_df['date'], summary_df['scene_id']))
 
-# ---------------------------------------------------------
-# MODE 1: OVERVIEW (STUDY AREA & LULC)
-# ---------------------------------------------------------
+# MODE 1: OVERVIEW
 if mode == "Overview (Study Area & LULC)":
     st.subheader("📍 Study Area & Urban Sprawl Overview")
-    
     col_img1, col_img2 = st.columns(2)
-    
     study_map_path = fig_dir / '01_study_area_map_publication_refined.png'
     lulc_map_path = fig_dir / '07_lulc_5class_calibrated.png'
     
@@ -74,18 +71,16 @@ if mode == "Overview (Study Area & LULC)":
         if study_map_path.exists():
             st.image(Image.open(study_map_path), use_container_width=True)
         else:
-            st.info("Study Area Map generating...")
+            st.info("Study Area Map loading...")
             
     with col_img2:
         st.markdown("#### 10-Year 5-Class LULC Urban Sprawl (2015 vs. 2023)")
         if lulc_map_path.exists():
             st.image(Image.open(lulc_map_path), use_container_width=True)
         else:
-            st.info("LULC Map generating...")
+            st.info("LULC Map loading...")
 
-# ---------------------------------------------------------
 # MODE 2: SINGLE-DATE ANALYSIS
-# ---------------------------------------------------------
 elif mode == "Single-Date Microclimate":
     selected_date = st.sidebar.selectbox("Select Observation Date", date_options, index=len(date_options)-1)
     selected_scene = scene_map[selected_date]
@@ -140,9 +135,7 @@ elif mode == "Single-Date Microclimate":
         fig.update_layout(height=380)
         st.plotly_chart(fig, use_container_width=True)
 
-# ---------------------------------------------------------
 # MODE 3: DUAL-DATE COMPARISON
-# ---------------------------------------------------------
 elif mode == "Dual-Date Comparison":
     col_d1, col_d2 = st.sidebar.columns(2)
     date1 = col_d1.selectbox("Date 1 (Baseline)", date_options, index=0)
@@ -152,7 +145,6 @@ elif mode == "Dual-Date Comparison":
     
     st.subheader(f"🔄 Comparing {date1} vs. {date2}")
     col_m1, col_m2 = st.columns(2)
-    
     wgs_gdf = zones_persistence.to_crs(epsg=4326)
     centroid = wgs_gdf.union_all().centroid
     
@@ -170,12 +162,9 @@ elif mode == "Dual-Date Comparison":
         folium.Choropleth(geo_data=m2_gdf, data=m2_gdf, columns=["zone_id", "lst_mean"], key_on="feature.properties.zone_id", fill_color="YlOrRd", fill_opacity=0.75, legend_name=f"LST {date2} (°C)").add_to(m2)
         st_folium(m2, width="100%", height=420, key="map2")
 
-# ---------------------------------------------------------
 # MODE 4: ML & HOTSPOT PERSISTENCE
-# ---------------------------------------------------------
 else:
     c_ml1, c_ml2 = st.columns([1.2, 1])
-    
     with c_ml1:
         st.subheader("🔥 10-Year Hotspot Persistence Map (Getis-Ord Gi*)")
         wgs_gdf = zones_persistence.to_crs(epsg=4326)
@@ -222,7 +211,7 @@ st.download_button(
     mime="text/csv"
 )
 
-# Scientific Caveats Expander (Section 15 Compliance)
+# Scientific Caveats Expander
 with st.expander("📚 Scientific Methodology & Thesis Limitations (Click to Expand)"):
     st.markdown('''
     1. **LST vs. Air Temperature:** Landsat measures Radiative Land Surface Temperature (LST), which is distinct from 2 m air temperature measured by meteorological weather stations.
