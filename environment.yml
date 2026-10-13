@@ -1,0 +1,36 @@
+name: uhi
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - gdal
+  - rasterio
+  - geopandas
+  - rioxarray
+  - rasterstats
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - statsmodels
+  - xgboost
+  - shap
+  - matplotlib
+  - seaborn
+  - plotly
+  - folium
+  - branca
+  - libpysal
+  - esda
+  - streamlit
+  - jupyter
+  - ipykernel
+  - pystac-client
+  - planetary-computer
+  - tqdm
+  - pip
+  - pip:
+      - streamlit-folium
+      - osmnx
+      - matplotlib-scalebar

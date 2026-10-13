@@ -1,0 +1,11 @@
+# Heavy Raw Satellite Rasters (Keep GeoJSONs & CSVs)
+data/raw/*/*.tif
+data/processed/*/*.tif
+
+# Python / Colab Cache Files
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.DS_Store
+*.deb
+cloudflared*

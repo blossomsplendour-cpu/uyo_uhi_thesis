@@ -1,0 +1,15 @@
+{
+    "scene_id": "LC09_L2SP_188056_20231217_02_T1",
+    "satellite": "landsat-9",
+    "acquisition_date": "2023-12-17",
+    "cloud_cover_percent": 0.25,
+    "wrs_path": "188",
+    "wrs_row": "056",
+    "bands_saved": [
+        "SR_B4",
+        "SR_B5",
+        "SR_B6",
+        "ST_B10",
+        "QA_PIXEL"
+    ]
+}
