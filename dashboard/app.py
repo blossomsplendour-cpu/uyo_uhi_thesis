@@ -26,6 +26,13 @@ def load_summary():
     return pd.read_csv(out_dir / 'summary_by_date.csv')
 
 @st.cache_data
+def load_lulc_summary():
+    lulc_f = out_dir / 'lulc_summary_all_years.csv'
+    if lulc_f.exists():
+        return pd.read_csv(lulc_f)
+    return None
+
+@st.cache_data
 def load_persistence_zones():
     return gpd.read_file(out_dir / 'hotspot_persistence_zones.geojson')
 
@@ -41,6 +48,7 @@ def load_ml_metrics():
     return None
 
 summary_df = load_summary()
+lulc_summary_df = load_lulc_summary()
 zones_persistence = load_persistence_zones()
 ml_metrics_df = load_ml_metrics()
 
@@ -50,37 +58,42 @@ st.caption("A Reproducible Multi-Temporal Analysis (2015–2025) Using Landsat 8
 st.sidebar.header("🕹️ Explorer Modes")
 mode = st.sidebar.radio(
     "Select Mode", 
-    ["Overview (Study Area & LULC)", "Single-Date Microclimate", "Dual-Date Comparison", "ML & Hotspot Persistence"]
+    ["Overview (Study Area & Multi-Year LULC)", "Single-Date Microclimate", "Dual-Date Comparison", "ML & Hotspot Persistence"]
 )
 
 date_options = summary_df['date'].tolist()
 scene_map = dict(zip(summary_df['date'], summary_df['scene_id']))
 
-# ---------------------------------------------------------
-# MODE 1: OVERVIEW (STUDY AREA & LULC)
-# ---------------------------------------------------------
-if mode == "Overview (Study Area & LULC)":
-    st.subheader("📍 Study Area & Urban Sprawl Overview")
+# MODE 1: OVERVIEW (STUDY AREA & MULTI-YEAR LULC)
+if mode == "Overview (Study Area & Multi-Year LULC)":
+    st.subheader("📍 Study Area & Multi-Year LULC Trajectory (2015–2025)")
     
-    col_img1, col_img2 = st.columns(2)
-    study_map_path = fig_dir / '01_study_area_map_publication_refined.png'
-    lulc_map_path = fig_dir / '07_lulc_5class_calibrated.png'
+    tab1, tab2, tab3 = st.tabs(["🗺️ Publication Study Area Map", "🧩 6-Year LULC Spatial Grid", "📊 LULC Composition Trend"])
     
-    with col_img1:
-        st.markdown("#### Publication Study Area Map")
+    with tab1:
+        study_map_path = fig_dir / '01_study_area_map_publication_refined.png'
         if study_map_path.exists():
             st.image(Image.open(study_map_path), use_container_width=True)
             st.info("📌 **Map Guide:** Main map displays Uyo LGA boundary in yellow/red with key settlements and major road network. Insets A and B provide Akwa Ibom State and Nigeria location context.")
             
-    with col_img2:
-        st.markdown("#### 10-Year 5-Class LULC Urban Sprawl (2015 vs. 2023)")
-        if lulc_map_path.exists():
-            st.image(Image.open(lulc_map_path), use_container_width=True)
-            st.info("📌 **Map Guide:** **Red** = Built-Up/Impervious, **Dark Green** = Forest/Trees, **Light Green** = Crops, **Yellow** = Bare Soil, **Blue** = Wetlands/Streams.")
+    with tab2:
+        lulc_grid_path = fig_dir / '08_lulc_multi_temporal_grid.png'
+        if lulc_grid_path.exists():
+            st.image(Image.open(lulc_grid_path), use_container_width=True)
+            st.info("📌 **Map Guide:** **Red** = Built-Up/Impervious, **Dark Green** = Forest/Trees, **Light Green** = Crops, **Yellow** = Bare Soil, **Blue** = Wetlands/Streams across all 6 observation dates.")
+            
+    with tab3:
+        if lulc_summary_df is not None:
+            col_chart, col_tbl = st.columns([1.2, 1])
+            with col_chart:
+                lulc_bar_path = fig_dir / '09_lulc_stacked_bar_trend.png'
+                if lulc_bar_path.exists():
+                    st.image(Image.open(lulc_bar_path), use_container_width=True)
+            with col_tbl:
+                st.markdown("#### 10-Year LULC Class Metrics (sq km)")
+                st.dataframe(lulc_summary_df[['year', 'built_up_km2', 'dense_veg_km2', 'sparse_veg_km2', 'bare_soil_km2', 'built_up_pct']], use_container_width=True)
 
-# ---------------------------------------------------------
 # MODE 2: SINGLE-DATE ANALYSIS
-# ---------------------------------------------------------
 elif mode == "Single-Date Microclimate":
     selected_date = st.sidebar.selectbox("Select Observation Date", date_options, index=len(date_options)-1)
     selected_scene = scene_map[selected_date]
@@ -112,42 +125,27 @@ elif mode == "Single-Date Microclimate":
         m = folium.Map(location=[centroid.y, centroid.x], zoom_start=12, tiles="OpenStreetMap")
         
         if selected_layer == "Land Surface Temperature (°C)":
-            folium.Choropleth(
-                geo_data=wgs_gdf, data=wgs_gdf, columns=["zone_id", "lst_mean"],
-                key_on="feature.properties.zone_id", fill_color="YlOrRd", fill_opacity=0.75,
-                line_opacity=0.3, nan_fill_color="#f7f7f7", nan_fill_opacity=0.2, legend_name="LST (°C)"
-            ).add_to(m)
+            folium.Choropleth(geo_data=wgs_gdf, data=wgs_gdf, columns=["zone_id", "lst_mean"], key_on="feature.properties.zone_id", fill_color="YlOrRd", fill_opacity=0.75, line_opacity=0.3, nan_fill_color="#f7f7f7", nan_fill_opacity=0.2, legend_name="LST (°C)").add_to(m)
             st_folium(m, width="100%", height=420)
-            st.info("💡 **Map Guide (LST):** **Dark Red/Orange** = Hot Surface Microclimates (>38°C), **Yellow** = Cooler Vegetated Surfaces (<34°C). Scale bar in top-left shows temperature range.")
+            st.info("💡 **Map Guide (LST):** **Dark Red/Orange** = Hot Surface Microclimates (>38°C), **Yellow** = Cooler Vegetated Surfaces (<34°C).")
             
         elif selected_layer == "Vegetation Index (NDVI)":
-            folium.Choropleth(
-                geo_data=wgs_gdf, data=wgs_gdf, columns=["zone_id", "ndvi_mean"],
-                key_on="feature.properties.zone_id", fill_color="YlGn", fill_opacity=0.75,
-                line_opacity=0.3, nan_fill_color="#f7f7f7", nan_fill_opacity=0.2, legend_name="NDVI"
-            ).add_to(m)
+            folium.Choropleth(geo_data=wgs_gdf, data=wgs_gdf, columns=["zone_id", "ndvi_mean"], key_on="feature.properties.zone_id", fill_color="YlGn", fill_opacity=0.75, line_opacity=0.3, nan_fill_color="#f7f7f7", nan_fill_opacity=0.2, legend_name="NDVI").add_to(m)
             st_folium(m, width="100%", height=420)
             st.info("💡 **Map Guide (NDVI):** **Dark Green** = Dense Vegetation/Forest (>0.4), **Yellow** = Built-up / Bare Soil (<0.2).")
             
         elif selected_layer == "Built-Up Index (NDBI)":
-            folium.Choropleth(
-                geo_data=wgs_gdf, data=wgs_gdf, columns=["zone_id", "ndbi_mean"],
-                key_on="feature.properties.zone_id", fill_color="Oranges", fill_opacity=0.75,
-                line_opacity=0.3, nan_fill_color="#f7f7f7", nan_fill_opacity=0.2, legend_name="NDBI"
-            ).add_to(m)
+            folium.Choropleth(geo_data=wgs_gdf, data=wgs_gdf, columns=["zone_id", "ndbi_mean"], key_on="feature.properties.zone_id", fill_color="Oranges", fill_opacity=0.75, line_opacity=0.3, nan_fill_color="#f7f7f7", nan_fill_opacity=0.2, legend_name="NDBI").add_to(m)
             st_folium(m, width="100%", height=420)
-            st.info("💡 **Map Guide (NDBI):** **Dark Orange/Red** = High Built-Up Density / Concrete (>0.0), **Light Yellow** = Vegetated/Non-built (<-0.1).")
+            st.info("💡 **Map Guide (NDBI):** **Dark Orange/Red** = High Built-Up Density (>0.0), **Light Yellow** = Vegetated/Non-built (<-0.1).")
             
         else:
             cutoff = np.nanpercentile(zonal_df['lst_mean'], p_threshold)
             p_zones = wgs_gdf[wgs_gdf['lst_mean'] >= cutoff]
             folium.GeoJson(wgs_gdf, style_function=lambda x: {'fillColor': '#e0e0e0', 'color': '#999999', 'weight': 0.5, 'fillOpacity': 0.2}).add_to(m)
-            folium.GeoJson(
-                p_zones, style_function=lambda x: {'fillColor': '#d95f02', 'color': '#900000', 'weight': 1.5, 'fillOpacity': 0.75},
-                tooltip=folium.GeoJsonTooltip(fields=['zone_id', 'lst_mean', 'ndvi_mean'], aliases=['Zone:', 'LST (°C):', 'NDVI:'])
-            ).add_to(m)
+            folium.GeoJson(p_zones, style_function=lambda x: {'fillColor': '#d95f02', 'color': '#900000', 'weight': 1.5, 'fillOpacity': 0.75}, tooltip=folium.GeoJsonTooltip(fields=['zone_id', 'lst_mean', 'ndvi_mean'], aliases=['Zone:', 'LST (°C):', 'NDVI:'])).add_to(m)
             st_folium(m, width="100%", height=420)
-            st.info(f"💡 **Map Guide (Priority Zones):** **Orange/Red Cells** = Priority targets ranking in the upper **{p_threshold}th percentile** for surface temperature requiring immediate greening interventions.")
+            st.info(f"💡 **Map Guide (Priority Zones):** **Orange/Red Cells** = Upper **{p_threshold}th percentile** targets requiring immediate urban greening.")
 
     with right_col:
         st.subheader("📈 Microclimate OLS Regression")
@@ -159,9 +157,7 @@ elif mode == "Single-Date Microclimate":
         fig.update_layout(height=420)
         st.plotly_chart(fig, use_container_width=True)
 
-# ---------------------------------------------------------
 # MODE 3: DUAL-DATE COMPARISON
-# ---------------------------------------------------------
 elif mode == "Dual-Date Comparison":
     col_d1, col_d2 = st.sidebar.columns(2)
     date1 = col_d1.selectbox("Date 1 (Baseline)", date_options, index=0)
@@ -188,11 +184,9 @@ elif mode == "Dual-Date Comparison":
         folium.Choropleth(geo_data=m2_gdf, data=m2_gdf, columns=["zone_id", "lst_mean"], key_on="feature.properties.zone_id", fill_color="YlOrRd", fill_opacity=0.75, nan_fill_color="#f7f7f7", nan_fill_opacity=0.2, legend_name=f"LST {date2} (°C)").add_to(m2)
         st_folium(m2, width="100%", height=400, key="map2")
         
-    st.info("💡 **Comparison Guide:** Compare spatial shifts in high-temperature red zones between the baseline year and comparison year. Scale bars in top-left corners reflect exact observation ranges.")
+    st.info("💡 **Comparison Guide:** Compare spatial shifts in high-temperature red zones between baseline and comparison dates.")
 
-# ---------------------------------------------------------
 # MODE 4: ML & HOTSPOT PERSISTENCE
-# ---------------------------------------------------------
 else:
     c_ml1, c_ml2 = st.columns([1.2, 1])
     with c_ml1:
