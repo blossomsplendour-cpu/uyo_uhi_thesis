@@ -5,5 +5,7 @@ rioxarray
 folium
 streamlit-folium
 plotly
+statsmodels
+scikit-learn
 Pillow
 numpy
